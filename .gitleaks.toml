@@ -1,0 +1,9 @@
+title = "Gitleaks Configuration"
+
+[allowlist]
+description = "Allowlisted files and patterns"
+paths = [
+    '''dummy_data\.xlsx''',
+    '''categories\.docx''',
+    '''tests/''',
+]

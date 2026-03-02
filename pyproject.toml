@@ -1,0 +1,41 @@
+[project]
+name = "excel-word-matcher"
+version = "1.0.0"
+description = "GUI utility for cross-matching Excel and Word documents with OKPD2 code highlighting"
+requires-python = ">=3.10"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "S",     # flake8-bandit (security)
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "UP",    # pyupgrade
+    "SIM",   # flake8-simplify
+]
+ignore = [
+    "S101",  # assert used in tests
+    "S603",  # subprocess without shell=True (not applicable)
+    "I001",  # import sorting handled by ruff format
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["beaver2"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S106"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
