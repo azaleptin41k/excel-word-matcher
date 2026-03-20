@@ -14,11 +14,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Build builder image
-      run: docker build -t excel-word-matcher-builder .
+    - name: Build Docker image (multi-stage)
+      run: docker build -t excel-word-matcher .
 
-    - name: Run compilation inside Docker
-      run: docker run --rm -v ${{ github.workspace }}/dist:/app/dist excel-word-matcher-builder
+    - name: Extract compiled binary from image
+      run: |
+        docker create --name extract excel-word-matcher
+        docker cp extract:/app/dist/ ./dist/
+        docker rm extract
 
     - name: Upload compiled artifact
       uses: actions/upload-artifact@v4

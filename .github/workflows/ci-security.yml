@@ -1,0 +1,209 @@
+name: CI & Security Pipeline
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ── 1. Lint & Format Check ────────────────────────────────────────────────────
+  lint:
+    name: Lint (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Ruff
+        run: pip install ruff==0.8.6
+
+      - name: Run Ruff linter
+        run: ruff check . --output-format=github
+
+      - name: Run Ruff formatter check
+        run: ruff format --check .
+
+  # ── 2. Unit Tests ─────────────────────────────────────────────────────────────
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y python3-tk
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run tests with coverage
+        run: pytest tests/ -v --tb=short
+
+  # ── 3. SAST — Bandit (Python Security Linter) ────────────────────────────────
+  sast-bandit:
+    name: SAST (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit security scan
+        run: bandit -r . -f json -o bandit-report.json --severity-level medium || true
+
+      - name: Display Bandit results
+        if: always()
+        run: bandit -r . -f screen --severity-level medium || true
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  # ── 4. Secret Scanning — Gitleaks ────────────────────────────────────────────
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 5. Dependency Audit — pip-audit ──────────────────────────────────────────
+  dependency-audit:
+    name: Dependency Audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Install project dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt --output pip-audit-report.json --format json || true
+
+      - name: Display audit results
+        if: always()
+        run: pip-audit -r requirements.txt || true
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+
+  # ── 6. Docker Build + Trivy Image Scan ───────────────────────────────────────
+  docker-security:
+    name: Docker Build & Scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t excel-word-matcher:${{ github.sha }} .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: excel-word-matcher:${{ github.sha }}
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+          output: trivy-report.txt
+
+      - name: Display Trivy results
+        if: always()
+        run: cat trivy-report.txt 2>/dev/null || echo "No report generated"
+
+      - name: Run Trivy SARIF report
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: excel-word-matcher:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  # ── 7. SBOM Generation ──────────────────────────────────────────────────────
+  sbom:
+    name: SBOM (Syft)
+    runs-on: ubuntu-latest
+    needs: [docker-security]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t excel-word-matcher:${{ github.sha }} .
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: excel-word-matcher:${{ github.sha }}
+          artifact-name: sbom-excel-word-matcher.spdx.json
+          format: spdx-json
+
+  # ── 8. Final Gate ───────────────────────────────────────────────────────────
+  security-gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    needs: [lint, test, sast-bandit, secret-scan, dependency-audit, docker-security, sbom]
+    if: always()
+    steps:
+      - name: Check all security jobs
+        run: |
+          echo "=== Security Pipeline Summary ==="
+          echo "Lint:             ${{ needs.lint.result }}"
+          echo "Tests:            ${{ needs.test.result }}"
+          echo "SAST (Bandit):    ${{ needs.sast-bandit.result }}"
+          echo "Secret Scan:      ${{ needs.secret-scan.result }}"
+          echo "Dependency Audit: ${{ needs.dependency-audit.result }}"
+          echo "Docker Scan:      ${{ needs.docker-security.result }}"
+          echo "SBOM:             ${{ needs.sbom.result }}"
+          echo "================================="
+
+          if [[ "${{ needs.lint.result }}" == "failure" || \
+                "${{ needs.test.result }}" == "failure" || \
+                "${{ needs.secret-scan.result }}" == "failure" ]]; then
+            echo "❌ Critical checks failed!"
+            exit 1
+          fi
+          echo "✅ All critical checks passed."
