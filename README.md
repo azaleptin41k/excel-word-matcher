@@ -1,5 +1,7 @@
 # Excel-Word Cross-Matcher & Formatter
 
+[![CI & Security Pipeline](https://github.com/azaleptin41k/excel-word-matcher/actions/workflows/ci-security.yml/badge.svg?branch=master)](https://github.com/azaleptin41k/excel-word-matcher/actions/workflows/ci-security.yml)
+
 Утилита с графическим интерфейсом для автоматического парсинга Word-документов,
 сверки данных с Excel-таблицами и условного цветового форматирования строк.
 Создана для автоматизации работы отдела закупок.
@@ -15,6 +17,37 @@
 | Работа с Excel | `openpyxl` |
 | Работа с Word | `python-docx` |
 | Сборка в EXE | `PyInstaller` |
+| Контейнеризация | Docker (multi-stage build) |
+| CI/CD | GitHub Actions |
+| SAST | Bandit |
+| Secret Scanning | Gitleaks |
+| Dependency Audit | pip-audit |
+| Container Scanning | Trivy |
+| SBOM | Syft (SPDX) |
+| Linting | Ruff |
+| Тестирование | pytest + coverage |
+
+---
+
+## Security Pipeline
+
+Проект включает полноценный DevSecOps pipeline, запускаемый автоматически при каждом push и PR:
+
+```
+push / PR
+  │
+  ├─ Lint (Ruff)                  — проверка стиля и потенциальных ошибок
+  ├─ Tests (pytest)               — юнит-тесты с покрытием
+  ├─ SAST (Bandit)                — статический анализ безопасности Python-кода
+  ├─ Secret Scan (Gitleaks)       — обнаружение случайно закоммиченных секретов
+  ├─ Dependency Audit (pip-audit) — проверка зависимостей на известные CVE
+  ├─ Docker Build & Scan (Trivy)  — сборка образа + сканирование на уязвимости
+  ├─ SBOM (Syft)                  — генерация Software Bill of Materials
+  │
+  └─ Security Gate                — финальная проверка: все критические шаги пройдены
+```
+
+Подробнее о политике безопасности — в [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -30,13 +63,26 @@
 ## Структура проекта
 
 ```
-beaver2/
-├── beaver2.py          # Основной скрипт (GUI + вся логика)
-├── beaver2.spec        # Конфигурация PyInstaller
-├── requirements.txt    # Зависимости Python
-├── categories.docx     # Справочник категорий ОКПД2 (Word-таблица, 2 столбца)
-├── dummy_data.xlsx     # Тестовый Excel-файл с 65 строками фиктивных закупок
-└── .gitignore
+excel-word-matcher/
+├── .github/
+│   └── workflows/
+│       └── ci-security.yml     # CI/CD pipeline (lint, SAST, secrets, Trivy, SBOM)
+├── tests/
+│   ├── __init__.py
+│   └── test_core.py            # Юнит-тесты ядра (extract, match, highlight)
+├── beaver2.py                  # Основной скрипт (GUI + вся логика)
+├── beaver2.spec                # Конфигурация PyInstaller
+├── categories.docx             # Справочник категорий ОКПД2 (Word-таблица, 2 столбца)
+├── dummy_data.xlsx             # Тестовый Excel-файл с 65 строками фиктивных закупок
+├── Dockerfile                  # Multi-stage сборка (builder + non-root runtime)
+├── .dockerignore
+├── .gitignore
+├── .gitleaks.toml              # Конфигурация Gitleaks
+├── .pre-commit-config.yaml     # Pre-commit hooks (Ruff, Bandit, Gitleaks, и др.)
+├── pyproject.toml              # Настройки Ruff, pytest, Bandit
+├── requirements.txt            # Runtime-зависимости
+├── requirements-dev.txt        # Dev-зависимости (pytest, ruff, bandit, и др.)
+└── SECURITY.md                 # Политика безопасности
 ```
 
 ### Входные файлы
@@ -74,8 +120,29 @@ python beaver2.py
 5. Нажать **«Запустить обработку»** → будет создан `output.xlsx`.
 6. (Опционально) Выбрать файл для ОКПД2, указать столбцы поиска/вывода и нажать **«Заполнить ОКПД2»**.
 
-> **Подсказка:** В папке `categories.docx` уже есть готовый справочник из 25 категорий.  
+> **Подсказка:** В папке `categories.docx` уже есть готовый справочник из 25 категорий.
 > `dummy_data.xlsx` содержит 65 строк тестовых закупок — используйте его для проверки.
+
+---
+
+## Разработка
+
+```bash
+# Установить все зависимости (runtime + dev)
+pip install -r requirements.txt -r requirements-dev.txt
+
+# Настроить pre-commit hooks
+pre-commit install
+
+# Запустить тесты
+pytest tests/ -v --cov=beaver2
+
+# Запустить линтер
+ruff check .
+
+# Запустить SAST вручную
+bandit -r . --severity-level medium
+```
 
 ---
 
@@ -91,23 +158,24 @@ pyinstaller beaver2.spec
 
 ---
 
-## 🐳 Сборка через Docker (Изолированная среда / DevOps подход)
+## Docker (Multi-stage сборка)
 
-Для сборки проекта в чистой, воспроизводимой среде без засорения локальной ОС мы используем Docker-контейнер в качестве «одноразового сборочного цеха». 
+Dockerfile использует **multi-stage build** для минимального размера образа и **non-root user** для безопасного запуска.
 
 Поскольку сборка идёт на базе Linux-образа, на выходе генерируется исполняемый бинарный файл Linux (ELF). *Для сборки Windows .exe через Docker потребовался бы образ на базе Wine.*
 
 ```bash
-# 1. Создать образ сборщика из Dockerfile
-docker build -t excel-word-matcher-builder .
+# 1. Собрать образ
+docker build -t excel-word-matcher .
 
 # 2. Запустить сборку с пробросом папки dist на хост-машину
 # Для Windows (PowerShell):
-docker run --rm -v ${PWD}/dist:/app/dist excel-word-matcher-builder
+docker run --rm -v ${PWD}/dist:/app/dist excel-word-matcher
 
 # Для Linux/Mac/Git Bash:
-docker run --rm -v "$(pwd)/dist:/app/dist" excel-word-matcher-builder
+docker run --rm -v "$(pwd)/dist:/app/dist" excel-word-matcher
 ```
+
 После завершения команды в вашей локальной папке `dist/` появится собранный бинарник.
 
 ---
