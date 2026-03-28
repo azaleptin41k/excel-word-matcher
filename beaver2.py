@@ -1,16 +1,18 @@
-import tkinter as tk
-from tkinter import filedialog, colorchooser, messagebox
 import os
-import shutil
-from openpyxl import load_workbook
 import re
+import shutil
+import tkinter as tk
+from tkinter import colorchooser, filedialog, messagebox
+
 from docx import Document
-from openpyxl.utils import column_index_from_string
+from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+from openpyxl.utils import column_index_from_string
 
 # Код, строки с которым исключаются из цветового выделения.
 # Замените на реальный код из вашей классификации.
 EXCLUDED_OKPD2_CODE = "XX.XX.XX.XXX"
+
 
 class ExcelProcessorApp:
     def __init__(self, root):
@@ -31,45 +33,42 @@ class ExcelProcessorApp:
         tk.Entry(self.frame_getdata, textvariable=self.start_row_var).grid(row=1, column=1, padx=5, pady=5)
 
         self.source_file = tk.StringVar()
-        tk.Button(self.frame_getdata, text="Выбрать исходный Excel",
-                 command=self.select_source).grid(row=2, column=0, columnspan=2, pady=5)
+        tk.Button(self.frame_getdata, text="Выбрать исходный Excel", command=self.select_source).grid(
+            row=2, column=0, columnspan=2, pady=5
+        )
 
         # Параметры finder1.02.py
         self.frame_finder = tk.LabelFrame(root, text="2. Настройка поиска")
         self.frame_finder.pack(padx=10, pady=10, fill="x")
 
         self.numbers_file = tk.StringVar()
-        tk.Button(self.frame_finder, text="Выбрать файл номеров",
-                 command=self.select_numbers).pack(padx=5, pady=5)
+        tk.Button(self.frame_finder, text="Выбрать файл номеров", command=self.select_numbers).pack(padx=5, pady=5)
 
         # Параметры finderexcele
         self.frame_highlight = tk.LabelFrame(root, text="3. Настройка выделения")
         self.frame_highlight.pack(padx=10, pady=10, fill="x")
 
         self.color_var = tk.StringVar(value="#44944a")
-        tk.Button(self.frame_highlight, text="Выбрать цвет выделения",
-                 command=self.choose_color).pack(padx=5, pady=5)
+        tk.Button(self.frame_highlight, text="Выбрать цвет выделения", command=self.choose_color).pack(padx=5, pady=5)
 
         # Дополнительные настройки
         self.use_ogr_var = tk.BooleanVar()
-        tk.Checkbutton(root, text="Использовать ogrfinderexcele",
-                     variable=self.use_ogr_var).pack(padx=10, pady=5)
+        tk.Checkbutton(root, text="Использовать ogrfinderexcele", variable=self.use_ogr_var).pack(padx=10, pady=5)
 
         # Кнопки управления
         self.btn_frame = tk.Frame(root)
         self.btn_frame.pack(padx=10, pady=20)
 
-        tk.Button(self.btn_frame, text="Запустить обработку",
-                 command=self.process).pack(side=tk.LEFT, padx=5)
-        tk.Button(self.btn_frame, text="Заполнить ОКПД2",
-                 command=self.run_okpd).pack(side=tk.RIGHT, padx=5)
+        tk.Button(self.btn_frame, text="Запустить обработку", command=self.process).pack(side=tk.LEFT, padx=5)
+        tk.Button(self.btn_frame, text="Заполнить ОКПД2", command=self.run_okpd).pack(side=tk.RIGHT, padx=5)
 
         # Для names_numbers.py
         self.okpd_frame = tk.LabelFrame(root, text="Дополнительные настройки ОКПД2")
         self.okpd_frame.pack(padx=10, pady=10, fill="x")
         self.okpd_file = tk.StringVar()
-        tk.Button(self.okpd_frame, text="Выбрать файл для ОКПД2",
-                 command=self.select_okpd_file).grid(row=2, column=0, columnspan=2, pady=5)
+        tk.Button(self.okpd_frame, text="Выбрать файл для ОКПД2", command=self.select_okpd_file).grid(
+            row=2, column=0, columnspan=2, pady=5
+        )
 
         self.search_col_var = tk.StringVar(value="C")
         self.output_col_var = tk.StringVar(value="D")
@@ -108,7 +107,7 @@ class ExcelProcessorApp:
 
     def process_getdata(self):
         # Логика getdata.py
-        COLUMNS_TO_COPY = self.columns_var.get().split(',')
+        COLUMNS_TO_COPY = self.columns_var.get().split(",")
         START_ROW = self.start_row_var.get()
         SOURCE_FILE = "wrong_data.xlsx"
         OUTPUT_FILE = "vse.txt"
@@ -118,13 +117,13 @@ class ExcelProcessorApp:
             src_ws = src_wb.active
             column_indices = [column_index_from_string(col.strip()) - 1 for col in COLUMNS_TO_COPY]
 
-            with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+            with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
                 for row in src_ws.iter_rows(min_row=START_ROW, values_only=True):
                     current_values = [row[idx] for idx in column_indices]
                     if all(v is None for v in current_values):
                         continue
-                    formatted_values = [str(v) if v is not None else '' for v in current_values]
-                    f.write('\t'.join(formatted_values) + '\n')
+                    formatted_values = [str(v) if v is not None else "" for v in current_values]
+                    f.write("\t".join(formatted_values) + "\n")
             return True
         except Exception as e:
             messagebox.showerror("Ошибка getdata", str(e))
@@ -138,32 +137,33 @@ class ExcelProcessorApp:
             return False
 
         try:
+
             def read_numbers_from_file(filename):
-                with open(filename, 'r', encoding='utf-8') as f:
+                with open(filename, encoding="utf-8") as f:
                     return [line.strip() for line in f if line.strip()]
 
             def read_elements_from_file(filename):
-                with open(filename, 'r', encoding='utf-8') as f:
+                with open(filename, encoding="utf-8") as f:
                     return [line.strip() for line in f if line.strip()]
 
             numbers = read_numbers_from_file(numbers_file)
-            elements = read_elements_from_file('vse.txt')
-            output_file = 'found_elements.txt'
+            elements = read_elements_from_file("vse.txt")
+            output_file = "found_elements.txt"
 
-            with open(output_file, 'w', encoding='utf-8') as file:
+            with open(output_file, "w", encoding="utf-8") as file:
                 for number in numbers:
-                    pattern = rf'^{re.escape(number)}(\.|$)'
-                    parts = number.split('.')
+                    pattern = rf"^{re.escape(number)}(\.|$)"
+                    parts = number.split(".")
                     last_part = parts[-1]
-                    
+
                     # --- НАЧАЛО ИЗМЕНЕНИЯ ---
-                    # Новое условие: проверяем, если последняя часть - одна цифра ИЛИ если она заканчивается на '0' (и не является просто '0')
-                    if len(last_part) == 1 or (last_part.endswith('0') and len(last_part) > 1):
-                        
-                        # Если номер заканчивается на 0 (например, 12.34.56.10), 
+                    # Новое условие: проверяем, если последняя часть - одна цифра
+                    # ИЛИ если она заканчивается на '0' (и не является просто '0')
+                    if len(last_part) == 1 or (last_part.endswith("0") and len(last_part) > 1):
+                        # Если номер заканчивается на 0 (например, 12.34.56.10),
                         # мы должны использовать '12.34.56.1' как основу для поиска.
-                        if last_part.endswith('0'):
-                            base_number_prefix = '.'.join(parts[:-1] + [last_part[:-1]])
+                        if last_part.endswith("0"):
+                            base_number_prefix = ".".join(parts[:-1] + [last_part[:-1]])
                         else:
                             # Если последняя часть - одна цифра (например, 12.34.56.1),
                             # используем номер как есть.
@@ -173,7 +173,7 @@ class ExcelProcessorApp:
                         for element in elements:
                             if not element:
                                 continue
-                            
+
                             # Добавлена обработка ошибок на случай пустых строк в element
                             try:
                                 left_part = element.split()[0]
@@ -183,13 +183,13 @@ class ExcelProcessorApp:
 
                             if any(second_part.startswith(f"{search_prefix}{i}") for i in range(10)):
                                 file.write(f"{left_part}\n")
-                    
+
                     # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
                     for element in elements:
                         if not element:
                             continue
-                        
+
                         # Добавлена обработка ошибок на случай пустых строк в element
                         try:
                             left_part = element.split()[0]
@@ -208,7 +208,7 @@ class ExcelProcessorApp:
         # Логика finderexcele/ogrfinderexcele
         excel_file = "wrong_data.xlsx"
         output_file = "output.xlsx"
-        column_to_search = self.columns_var.get().split(',')[0]
+        column_to_search = self.columns_var.get().split(",")[0]
         print(column_to_search)
         color = self.color_var.get()
 
@@ -216,9 +216,7 @@ class ExcelProcessorApp:
             # Логика ogrfinderexcele_2.py
             def highlight_matching_rows(workbook, elements):
                 sheet = workbook.active
-                green_fill = PatternFill(start_color=color[1:],
-                                        end_color=color[1:],
-                                        fill_type="solid")
+                green_fill = PatternFill(start_color=color[1:], end_color=color[1:], fill_type="solid")
                 elements_set = set(elements)
                 col_idx = column_index_from_string(column_to_search) - 1
 
@@ -228,10 +226,7 @@ class ExcelProcessorApp:
                     cell = row[col_idx]
                     cell_value = str(cell.value).strip() if cell.value else ""
                     if cell_value in elements_set:
-                        has_forbidden = any(
-                            str(c.value).strip() == EXCLUDED_OKPD2_CODE
-                            for c in row
-                        )
+                        has_forbidden = any(str(c.value).strip() == EXCLUDED_OKPD2_CODE for c in row)
                         if not has_forbidden:
                             for c in row:
                                 c.fill = green_fill
@@ -239,9 +234,7 @@ class ExcelProcessorApp:
             # Логика finderexcele_2.py
             def highlight_matching_rows(workbook, elements):
                 sheet = workbook.active
-                green_fill = PatternFill(start_color=color[1:],
-                                        end_color=color[1:],
-                                        fill_type="solid")
+                green_fill = PatternFill(start_color=color[1:], end_color=color[1:], fill_type="solid")
                 elements_set = set(elements)
                 col_idx = column_index_from_string(column_to_search) - 1
 
@@ -255,7 +248,8 @@ class ExcelProcessorApp:
                             c.fill = green_fill
 
         try:
-            elements = [line.strip() for line in open('found_elements.txt', 'r', encoding='utf-8')]
+            with open("found_elements.txt", encoding="utf-8") as fe:
+                elements = [line.strip() for line in fe]
             wb = load_workbook(excel_file)
             highlight_matching_rows(wb, elements)
             wb.save(output_file)
@@ -265,11 +259,7 @@ class ExcelProcessorApp:
             return False
 
     def cleanup_temp_files(self):
-        temp_files = [
-            "wrong_data.xlsx",
-            "vse.txt",
-            "found_elements.txt"
-        ]
+        temp_files = ["wrong_data.xlsx", "vse.txt", "found_elements.txt"]
         for file in temp_files:
             try:
                 if os.path.exists(file):
@@ -323,8 +313,7 @@ class ExcelProcessorApp:
 
         def get_merged_cell(ws, row, col):
             for merged in ws.merged_cells.ranges:
-                if (merged.min_row <= row <= merged.max_row and
-                    merged.min_col <= col <= merged.max_col):
+                if merged.min_row <= row <= merged.max_row and merged.min_col <= col <= merged.max_col:
                     return ws.cell(merged.min_row, merged.min_col)
             return None
 
