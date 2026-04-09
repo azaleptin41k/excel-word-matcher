@@ -91,6 +91,27 @@ pyinstaller beaver2.spec
 
 ---
 
+## 🐳 Сборка через Docker (Изолированная среда / DevOps подход)
+
+Для сборки проекта в чистой, воспроизводимой среде без засорения локальной ОС мы используем Docker-контейнер в качестве «одноразового сборочного цеха». 
+
+Поскольку сборка идёт на базе Linux-образа, на выходе генерируется исполняемый бинарный файл Linux (ELF). *Для сборки Windows .exe через Docker потребовался бы образ на базе Wine.*
+
+```bash
+# 1. Создать образ сборщика из Dockerfile
+docker build -t excel-word-matcher-builder .
+
+# 2. Запустить сборку с пробросом папки dist на хост-машину
+# Для Windows (PowerShell):
+docker run --rm -v ${PWD}/dist:/app/dist excel-word-matcher-builder
+
+# Для Linux/Mac/Git Bash:
+docker run --rm -v "$(pwd)/dist:/app/dist" excel-word-matcher-builder
+```
+После завершения команды в вашей локальной папке `dist/` появится собранный бинарник.
+
+---
+
 ## Настройка исключения кодов
 
 В `beaver2.py` есть константа `EXCLUDED_OKPD2_CODE` — код ОКПД2, строки с которым
